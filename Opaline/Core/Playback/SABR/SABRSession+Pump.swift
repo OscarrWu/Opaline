@@ -54,6 +54,7 @@ extension SABRSession {
             self.inFlight = false
             switch result {
             case .failure(let error):
+                self.jumpPending = false
                 self.finishWaiters(with: error)
             case .success:
                 self.afterResponse()

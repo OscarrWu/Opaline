@@ -51,13 +51,25 @@ extension SABRSession {
             sawMedia = apply(part, headers: &headers) || sawMedia
         }
         sawMediaInLastResponse = sawMedia
+        if sawMedia {
+            jumpPending = false
+        }
         AppLog.hls("sabr resp parts=\(parts.map(\.type)) sawMedia=\(sawMedia)")
         if !sawMedia {
-            // No media at all means the server declined rather than the stream
-            // ending — some videos are simply not served over SABR, and the
-            // part types say which case this is.
-            AppLog.hls("sabr declined, parts: \(parts.map(\.type))")
-            markEnded()
+            if jumpPending {
+                // The server answered the jump with policy only
+                // (SELECTABLE_FORMATS, PLAYBACK_START_POLICY,
+                // NEXT_REQUEST_POLICY): it accepted the reposition and expects
+                // the next request to carry the new cookie. Keep the session
+                // alive; afterResponse retries, bounded by maxEmptyRounds.
+                AppLog.hls("sabr jump: no media yet, retrying")
+            } else {
+                // No media at all means the server declined rather than the
+                // stream ending — some videos are simply not served over SABR,
+                // and the part types say which case this is.
+                AppLog.hls("sabr declined, parts: \(parts.map(\.type))")
+                markEnded()
+            }
         }
         return .success(())
     }
@@ -78,6 +90,7 @@ extension SABRSession {
         case .nextRequestPolicy:
             if let cookie = Protobuf.parse(part.payload).data(7) {
                 setPlaybackCookie(cookie)
+                AppLog.hls("sabr cookie: \(cookie.count)B")
             }
         case .streamProtectionStatus:
             // 1 = OK, 2 = attestation pending, 3 = attestation required. The
