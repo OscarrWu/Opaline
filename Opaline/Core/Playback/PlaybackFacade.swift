@@ -75,9 +75,7 @@ extension PlaybackFacade {
         let source = DefaultVideoSourceFactory(apiClient: apiClient)
             .make(kind: kind)
         activeVideoSource = source
-        source.onReloadRequested = { [weak self] ms in
-            self?.context?.rebuildSABR(at: ms)
-        }
+        source.onReloadRequested = { [weak self] ms in self?.context?.rebuildSABR(at: ms) }
         context?.updateStatusLabel(statusKey.localized)
         PlaybackProgress.report = { [weak self] text in
             self?.context?.updateStatusLabel(text)

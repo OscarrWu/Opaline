@@ -85,19 +85,7 @@ extension AndroidVRSource {
             for: request.info, transport: transport, client: client, poToken: sabrPoToken
         )
         delivery = first
-        if let sabr = first as? SABRDelivery {
-            sabr.onReloadRequested = { [weak self] ms in
-                guard let self else {
-                    return
-                }
-                self.sabrReloadAttempts += 1
-                guard self.sabrReloadAttempts <= 2 else {
-                    AppLog.player("sabr reload: attempts spent, falling back to recovery")
-                    return
-                }
-                self.sabrReloadRelay?(ms)
-            }
-        }
+        attachReloadRelay(to: first as? SABRDelivery)
         let started = CACurrentMediaTime()
         first.prepare(request) { [weak self] result in
             let elapsed = (CACurrentMediaTime() - started) * 1_000
@@ -127,6 +115,26 @@ extension AndroidVRSource {
             )
             self?.delivery = second
             second.prepare(request, completion: completion)
+        }
+    }
+
+    /// Wires a SABR delivery's rebuild requests to the facade, bounded per
+    /// source instance so a rebuilt session that fails again falls back to
+    /// the existing recovery path instead of looping forever.
+    private func attachReloadRelay(to sabr: SABRDelivery?) {
+        guard let sabr else {
+            return
+        }
+        sabr.onReloadRequested = { [weak self] ms in
+            guard let self else {
+                return
+            }
+            self.sabrReloadAttempts += 1
+            guard self.sabrReloadAttempts <= 2 else {
+                AppLog.player("sabr reload: attempts spent, falling back to recovery")
+                return
+            }
+            self.sabrReloadRelay?(ms)
         }
     }
 }
