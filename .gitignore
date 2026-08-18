@@ -24,4 +24,7 @@ AGENTS.md
 .mimocode/
 .codegraph/
 
+# Local technical docs
+docs/
+
 __pycache__/
