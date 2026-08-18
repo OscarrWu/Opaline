@@ -51,6 +51,7 @@ extension SABRSession {
             sawMedia = apply(part, headers: &headers) || sawMedia
         }
         sawMediaInLastResponse = sawMedia
+        AppLog.hls("sabr resp parts=\(parts.map(\.type)) sawMedia=\(sawMedia)")
         if !sawMedia {
             // No media at all means the server declined rather than the stream
             // ending — some videos are simply not served over SABR, and the
@@ -119,6 +120,11 @@ extension SABRSession {
         // Media arrives in several parts per segment; each continues where the
         // previous one stopped, so position by what is already buffered.
         let written = bufferedLength(itag: header.itag, from: header.startRange)
+        AppLog.hls(
+            "media itag=\(header.itag) start=\(header.startRange) written=\(written)"
+                + " seq=\(header.sequence) bufferedMs=\(header.bufferedMs)"
+                + " init=\(header.isInit) bytes=\(data.count)"
+        )
         store(SABRSegment(
             itag: header.itag,
             start: header.startRange + written,

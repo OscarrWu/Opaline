@@ -51,6 +51,10 @@ extension SABRSession {
             timeMs: lastServedMs,
             sequence: max(1, lastServedMs / 5_000)
         )
+        AppLog.hls(
+            "pump waiting=\(waiting.count) target=\(target.timeMs)ms itag=\(target.itag)"
+                + " off=\(target.offset) prefetch=\(earliest == nil)"
+        )
         guard let body = nextBody(for: target) else {
             AppLog.hls("sabr pump: nothing to send, end=\(reachedEnd)")
             finishWaiters(with: SABRError.stalled)

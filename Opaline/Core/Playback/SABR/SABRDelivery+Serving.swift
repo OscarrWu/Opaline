@@ -104,11 +104,16 @@ extension SABRDelivery {
             completion(nil, "")
             return
         }
+        let requestTime = timeMs(at: range.offset, in: track)
+        AppLog.hls(
+            "segment req \(track.path)/\(name) off=\(range.offset) len=\(range.length)"
+                + " t=\(requestTime) seq=\((Int(name) ?? 0) + 1)"
+        )
         session.read(SABRReadRequest(
             itag: track.format.itag,
             offset: range.offset,
             length: range.length,
-            timeMs: timeMs(at: range.offset, in: track),
+            timeMs: requestTime,
             sequence: (Int(name) ?? 0) + 1
         )) { result in
             switch result {

@@ -120,6 +120,10 @@ final class SABRSession {
             if let data = self.buffered(
                 itag: request.itag, offset: request.offset, length: request.length
             ) {
+                AppLog.hls(
+                    "read itag=\(request.itag) off=\(request.offset)"
+                        + " t=\(request.timeMs) HIT"
+                )
                 self.markRead(
                     itag: request.itag,
                     offset: request.offset,
@@ -129,6 +133,10 @@ final class SABRSession {
                 completion(.success(data))
                 return
             }
+            AppLog.hls(
+                "read itag=\(request.itag) off=\(request.offset)"
+                    + " t=\(request.timeMs) MISS"
+            )
             self.waiting.append(Waiter(request: request, completion: completion))
             self.pump()
         }
@@ -143,9 +151,16 @@ final class SABRSession {
         // Restarting on those threw away all progress, so the server resent the
         // opening segments, which made playback slower, which caused more
         // retries — the loop this guard exists to break.
-        let seeking = (needsSeek(itag: request.itag, offset: request.offset)
-            && !isRetry(itag: request.itag, offset: request.offset))
-            || isAheadOfStream(request)
+        let needsSeek = needsSeek(itag: request.itag, offset: request.offset)
+        let isRetry = isRetry(itag: request.itag, offset: request.offset)
+        let ahead = isAheadOfStream(request)
+        let seeking = (needsSeek && !isRetry) || ahead
+        AppLog.hls(
+            "nextBody itag=\(request.itag) off=\(request.offset) t=\(request.timeMs)"
+                + " seq=\(request.sequence) seeking=\(seeking) needsSeek=\(needsSeek)"
+                + " retry=\(isRetry) ahead=\(ahead)"
+                + " bufferedMs=\(progress.values.map(\.bufferedMs).min() ?? 0)"
+        )
         guard !seeking else {
             resetBuffers()
             progress.removeAll()
@@ -154,13 +169,18 @@ final class SABRSession {
             // Jump rather than start over: a startup request would stream from
             // the beginning of the video again, and the player would sit
             // waiting while the session ground its way back to the playhead.
+            let jumpSequence = max(1, request.timeMs / 5_000)
+            AppLog.hls(
+                "jump playerMs=\(request.timeMs) seq=\(jumpSequence)"
+                    + " bufferedMs=\(request.timeMs)"
+            )
             return SABRRequest.jump(
                 ustreamerConfig: ustreamerConfig,
                 audio: audio,
                 video: video,
                 identity: identity,
                 playerMs: request.timeMs,
-                sequence: max(1, request.timeMs / 5_000)
+                sequence: jumpSequence
             )
         }
         return reachedEnd ? nil : continuationBody(timeMs: request.timeMs)
