@@ -60,15 +60,20 @@ extension SABRSession {
         resetBuffers()
         progress.removeAll()
         lastServedMs = timeMs
+        // Segments run about five seconds; the exact figure does not matter,
+        // only that it is consistent with the buffer claimed. A fresh session
+        // has no real progress to report, so the claim is the target itself.
+        let sequence = max(1, timeMs / 5_000)
         let body = SABRRequest.jump(
             ustreamerConfig: ustreamerConfig,
-            audio: audio,
-            video: video,
             identity: identity,
             playerMs: timeMs,
-            // Segments run about five seconds; the exact figure does not
-            // matter, only that it is consistent with the buffer claimed.
-            sequence: max(1, timeMs / 5_000)
+            audioProgress: SABRStreamProgress(
+                format: audio, lastSequence: sequence, bufferedMs: timeMs
+            ),
+            videoProgress: SABRStreamProgress(
+                format: video, lastSequence: sequence, bufferedMs: timeMs
+            )
         )
         // Claimed as in flight so a read landing while it travels parks
         // instead of firing a second, competing request.

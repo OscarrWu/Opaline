@@ -66,27 +66,21 @@ enum SABRRequest {
     ///
     /// A startup request cannot do this — with a non-zero player time it comes
     /// back empty (verified 2026-08-14). What works is a continuation that
-    /// claims everything up to the target is already buffered, which is true
-    /// enough: the player is not going to ask for those bytes.
+    /// claims the real buffered position while pointing `playerMs` at the
+    /// target: claiming the target itself is buffered makes the server answer
+    /// with `reloadPlayerResponse` instead of media.
     static func jump(
         ustreamerConfig: Data,
-        audio: SabrFormatInfo,
-        video: SabrFormatInfo,
         identity: SABRIdentity,
         playerMs: Int,
-        sequence: Int = 1
+        audioProgress: SABRStreamProgress,
+        videoProgress: SABRStreamProgress
     ) -> Data {
-        let held = SABRStreamProgress(
-            format: audio, lastSequence: sequence, bufferedMs: playerMs
-        )
-        let heldVideo = SABRStreamProgress(
-            format: video, lastSequence: sequence, bufferedMs: playerMs
-        )
         // swiftlint:enable function_parameter_count
         return continuation(
             ustreamerConfig: ustreamerConfig,
             state: Continuation(
-                audio: held, video: heldVideo, playerMs: playerMs, playbackCookie: nil
+                audio: audioProgress, video: videoProgress, playerMs: playerMs, playbackCookie: nil
             ),
             identity: identity
         )

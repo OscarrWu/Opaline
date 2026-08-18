@@ -157,28 +157,37 @@ final class SABRSession {
         let seeking = (needsSeek && !isRetry) || ahead
         logNextBody(request, needsSeek: needsSeek, isRetry: isRetry, ahead: ahead)
         guard !seeking else {
-            resetBuffers()
-            progress.removeAll()
-            reachedEnd = false
-            lastServedMs = request.timeMs
-            // Jump rather than start over: a startup request would stream from
-            // the beginning of the video again, and the player would sit
-            // waiting while the session ground its way back to the playhead.
-            let jumpSequence = max(1, request.timeMs / 5_000)
-            AppLog.hls(
-                "jump playerMs=\(request.timeMs) seq=\(jumpSequence)"
-                    + " bufferedMs=\(request.timeMs)"
-            )
-            return SABRRequest.jump(
-                ustreamerConfig: ustreamerConfig,
-                audio: audio,
-                video: video,
-                identity: identity,
-                playerMs: request.timeMs,
-                sequence: jumpSequence
-            )
+            return jumpBody(for: request)
         }
         return reachedEnd ? nil : continuationBody(timeMs: request.timeMs)
+    }
+
+    /// A seek repositions the stream: claim where it really is, not the
+    /// target, then jump. Claiming the target itself is buffered makes the
+    /// server answer with reloadPlayerResponse instead of media.
+    private func jumpBody(for request: SABRReadRequest) -> Data? {
+        let audioProgress = progress[audio.itag]
+            ?? SABRStreamProgress(format: audio, lastSequence: 1, bufferedMs: 0)
+        let videoProgress = progress[video.itag]
+            ?? SABRStreamProgress(format: video, lastSequence: 1, bufferedMs: 0)
+        resetBuffers()
+        progress.removeAll()
+        reachedEnd = false
+        lastServedMs = request.timeMs
+        // Jump rather than start over: a startup request would stream from
+        // the beginning of the video again, and the player would sit
+        // waiting while the session ground its way back to the playhead.
+        AppLog.hls(
+            "jump playerMs=\(request.timeMs) audioBf=\(audioProgress.bufferedMs)"
+                + " videoBf=\(videoProgress.bufferedMs)"
+        )
+        return SABRRequest.jump(
+            ustreamerConfig: ustreamerConfig,
+            identity: identity,
+            playerMs: request.timeMs,
+            audioProgress: audioProgress,
+            videoProgress: videoProgress
+        )
     }
 
     /// Diagnostics for the seek investigation: why this read was classified
