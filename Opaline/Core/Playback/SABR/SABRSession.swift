@@ -160,7 +160,7 @@ final class SABRSession {
                 video: video,
                 identity: identity,
                 playerMs: request.timeMs,
-                sequence: request.sequence
+                sequence: max(1, request.timeMs / 5_000)
             )
         }
         return reachedEnd ? nil : continuationBody(timeMs: request.timeMs)
