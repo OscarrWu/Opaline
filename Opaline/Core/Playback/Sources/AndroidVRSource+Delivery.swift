@@ -4,6 +4,12 @@ import QuartzCore
 // MARK: - Choosing how the bytes arrive
 
 extension AndroidVRSource {
+    /// Forwards a session's rebuild request up to the playback facade.
+    private var sabrReloadRelay: ((Int) -> Void)?
+    /// Bounds rebuilds per source instance: a rebuilt session that fails
+    /// again must fall back to the existing recovery path, not loop forever.
+    private var sabrReloadAttempts = 0
+
     /// The user's pinned delivery, if they pinned one: no fallback, so a
     /// failure stays visible instead of being quietly papered over by the
     /// other delivery.
@@ -79,6 +85,19 @@ extension AndroidVRSource {
             for: request.info, transport: transport, client: client, poToken: sabrPoToken
         )
         delivery = first
+        if let sabr = first as? SABRDelivery {
+            sabr.onReloadRequested = { [weak self] ms in
+                guard let self else {
+                    return
+                }
+                self.sabrReloadAttempts += 1
+                guard self.sabrReloadAttempts <= 2 else {
+                    AppLog.player("sabr reload: attempts spent, falling back to recovery")
+                    return
+                }
+                self.sabrReloadRelay?(ms)
+            }
+        }
         let started = CACurrentMediaTime()
         first.prepare(request) { [weak self] result in
             let elapsed = (CACurrentMediaTime() - started) * 1_000

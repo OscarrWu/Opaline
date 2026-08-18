@@ -9,6 +9,9 @@ protocol PlaybackContext: AnyObject {
     /// Attaches a source-prepared item, retaining its resource loader; seeks to
     /// `resumeAt` when set (quality switches keep the current position).
     func attachPrepared(_ prepared: PreparedPlayback, resumeAt: CMTime?)
+    /// Rebuilds the SABR session after a failed seek / server reload, resuming
+    /// at `timeMs` (milliseconds).
+    func rebuildSABR(at timeMs: Int)
     func updateStatusLabel(_ text: String)
     func showPlaybackError(_ message: String)
     func startObservingPlayerItem(_ item: AVPlayerItem)

@@ -107,6 +107,11 @@ protocol VideoSource: AnyObject {
         completion: @escaping (Result<PreparedPlayback, Error>) -> Void
     )
 
+    /// SABR sessions ask their delivery to rebuild when a seek fails or the
+    /// server demands a reload; the handler receives the resume position in
+    /// milliseconds. Sources without SABR sessions ignore it.
+    var onReloadRequested: ((Int) -> Void)? { get set }
+
     /// Switches the audio track; the source rebuilds playback its own way.
     /// `resumeAt` means what it does for [[selectQuality]] — a sequential
     /// source (SABR) has to re-open its session at the playhead.
@@ -133,6 +138,13 @@ protocol VideoSource: AnyObject {
 
 extension VideoSource {
     var currentCodecs: String? { nil }
+
+    // SABR rebuild requests are opt-in: sources without SABR sessions never
+    // fire them, so the default is a no-op.
+    var onReloadRequested: ((Int) -> Void)? {
+        get { nil }
+        set {}
+    }
 
     // Audio-track selection is opt-in: sources whose client never returns
     // dub tracks (android_vr, progressive) inherit the disabled default.

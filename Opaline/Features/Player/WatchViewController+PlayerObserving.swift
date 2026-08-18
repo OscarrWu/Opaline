@@ -134,6 +134,9 @@ extension WatchViewController {
     }
 
     func logPlaybackFailure(_ item: AVPlayerItem) {
+        guard !isRebuildingSABR else {
+            return
+        }
         let nsError = item.error as NSError?
         let desc = item.error?.localizedDescription
             ?? "unknown"
@@ -176,6 +179,9 @@ extension WatchViewController {
     func playerItemDidFailToPlayToEnd(
         _ note: Notification
     ) {
+        guard !isRebuildingSABR else {
+            return
+        }
         let errorKey =
             AVPlayerItemFailedToPlayToEndTimeErrorKey
         let error =

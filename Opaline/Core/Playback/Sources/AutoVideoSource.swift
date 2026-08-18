@@ -23,7 +23,17 @@ final class AutoVideoSource: VideoSource {
     let primary: VideoSource
     private let makeFallback: () -> VideoSource
     /// The inner source currently answering playback/quality questions.
-    var active: VideoSource
+    var active: VideoSource {
+        didSet { applyReloadRelay() }
+    }
+    /// Forwards a rebuild request to whatever inner source is active, keeping
+    /// it applied across active-source switches (dub promotion).
+    private var reloadRelay: ((Int) -> Void)?
+    private func applyReloadRelay() {
+        active.onReloadRequested = { [weak self] ms in
+            self?.reloadRelay?(ms)
+        }
+    }
     /// Lazily created fallback instance — shared between the background dub
     /// probe and a later switch, so the probed /player info is built on
     /// directly instead of being fetched twice.
@@ -55,11 +65,21 @@ final class AutoVideoSource: VideoSource {
     var currentAudioTrack: AudioTrack? {
         active.currentAudioTrack ?? fallback?.currentAudioTrack
     }
+    var onReloadRequested: ((Int) -> Void)? {
+        get { reloadRelay }
+        set {
+            reloadRelay = newValue
+            applyReloadRelay()
+        }
+    }
 
     init(primary: VideoSource, makeFallback: @escaping () -> VideoSource) {
         self.primary = primary
         self.makeFallback = makeFallback
         active = primary
+        // didSet does not fire for assignments inside init, so apply the
+        // relay manually once.
+        applyReloadRelay()
     }
 
     func loadPlayback(

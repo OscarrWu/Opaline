@@ -74,17 +74,13 @@ enum SABRRequest {
         identity: SABRIdentity,
         playerMs: Int,
         audioProgress: SABRStreamProgress,
-        videoProgress: SABRStreamProgress,
-        playbackCookie: Data? = nil
+        videoProgress: SABRStreamProgress
     ) -> Data {
         // swiftlint:enable function_parameter_count
         continuation(
             ustreamerConfig: ustreamerConfig,
             state: Continuation(
-                audio: audioProgress,
-                video: videoProgress,
-                playerMs: playerMs,
-                playbackCookie: playbackCookie
+                audio: audioProgress, video: videoProgress, playerMs: playerMs, playbackCookie: nil
             ),
             identity: identity
         )

@@ -49,6 +49,40 @@ extension WatchViewController {
         }
     }
 
+    /// Rebuilds the SABR session after a failed seek or a server reload
+    /// request (part 46). Runs the quality-switch machinery at the same
+    /// quality, resuming at the position the session reported.
+    func rebuildSABR(at timeMs: Int) {
+        guard !isRebuildingSABR,
+              let source = playbackFacade.activeVideoSource,
+              let quality = source.currentQuality,
+              source.supportsQualitySelection else {
+            return
+        }
+        isRebuildingSABR = true
+        let target = Double(timeMs) / 1_000
+        AppLog.player("sabr reload: rebuilding at \(target)s")
+        playerStatusLabel.text = "player.status.loading".localized
+        playerStatusLabel.isHidden = false
+        source.selectQuality(quality, resumeAt: target) { [weak self] result in
+            DispatchQueue.main.async {
+                guard let self else {
+                    return
+                }
+                self.isRebuildingSABR = false
+                switch result {
+                case .success(let prepared):
+                    self.attachPrepared(
+                        prepared,
+                        resumeAt: CMTime(seconds: target, preferredTimescale: 1_000)
+                    )
+                case .failure:
+                    self.recoverPlayback()
+                }
+            }
+        }
+    }
+
     /// Seeks a freshly attached stream back to where the user was. Called from
     /// the item's ready callback: issued any earlier the player is still
     /// loading and silently drops it.

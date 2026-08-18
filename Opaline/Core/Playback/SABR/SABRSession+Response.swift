@@ -56,20 +56,7 @@ extension SABRSession {
         }
         AppLog.hls("sabr resp parts=\(parts.map(\.type)) sawMedia=\(sawMedia)")
         if !sawMedia {
-            if jumpPending {
-                // The server answered the jump with policy only
-                // (SELECTABLE_FORMATS, PLAYBACK_START_POLICY,
-                // NEXT_REQUEST_POLICY): it accepted the reposition and expects
-                // the next request to carry the new cookie. Keep the session
-                // alive; afterResponse retries, bounded by maxEmptyRounds.
-                AppLog.hls("sabr jump: no media yet, retrying")
-            } else {
-                // No media at all means the server declined rather than the
-                // stream ending — some videos are simply not served over SABR,
-                // and the part types say which case this is.
-                AppLog.hls("sabr declined, parts: \(parts.map(\.type))")
-                markEnded()
-            }
+            return handleMediaLessResponse(parts: parts)
         }
         return .success(())
     }
@@ -112,9 +99,41 @@ extension SABRSession {
             AppLog.hls("sabr error: fields=\(fields.keys.sorted()) raw=\(text.debugDescription)")
             return SABRError.server("server rejected the request")
         case .reloadPlayerResponse:
+            // The server demands a fresh player for this session (part 46).
+            // Rebuild at the session's current playhead.
+            AppLog.hls("sabr reload: player response expired, rebuilding at \(lastServedMs)ms")
+            requestReload(at: lastServedMs)
             return SABRError.server("player response expired")
         default:
             return nil
+        }
+    }
+
+    /// A response without media: a pending jump means the seek failed and the
+    /// session must be rebuilt; otherwise the server declined the session.
+    private func handleMediaLessResponse(parts: [UMPPart]) -> Result<Void, Error> {
+        if jumpPending {
+            AppLog.hls("sabr jump: no media, rebuilding at \(lastServedMs)ms")
+            requestReload(at: lastServedMs)
+            return .failure(SABRError.server("sabr seek needs reload"))
+        }
+        AppLog.hls("sabr declined, parts: \(parts.map(\.type))")
+        markEnded()
+        return .success(())
+    }
+
+    /// Asks the delivery to rebuild the session at `timeMs`. Fired once per
+    /// session; afterwards the session marks itself ended so stray reads from
+    /// the old item fail fast instead of firing competing requests.
+    private func requestReload(at timeMs: Int) {
+        guard !reloadRequested else {
+            return
+        }
+        reloadRequested = true
+        markEnded()
+        let handler = onReloadRequested
+        DispatchQueue.main.async {
+            handler?(timeMs)
         }
     }
 

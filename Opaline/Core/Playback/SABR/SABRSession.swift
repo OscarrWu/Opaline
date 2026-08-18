@@ -81,9 +81,15 @@ final class SABRSession {
     var inFlight = false
     var emptyRounds = 0
     /// A jump has been sent and its response has not yet brought media. While
-    /// true, further seeks send a continuation with the new playback cookie
-    /// instead of a second, competing jump.
+    /// true, a media-less response means the seek failed and the session must
+    /// be rebuilt at the jump target.
     var jumpPending = false
+    /// The delivery to ask for a rebuild when the server answers a seek with
+    /// policy only, or demands a reload (part 46). Parameter: where playback
+    /// should pick up, in milliseconds.
+    var onReloadRequested: ((Int) -> Void)?
+    /// Set once a reload has been requested so the session never asks twice.
+    var reloadRequested = false
     /// How far each stream has been read, so consumed bytes can be dropped.
     var readOffsets: [Int: Int64] = [:]
     /// Timeline position of the furthest read served, for the prefetch window.
@@ -161,12 +167,6 @@ final class SABRSession {
         let seeking = (needsSeek && !isRetry) || ahead
         logNextBody(request, needsSeek: needsSeek, isRetry: isRetry, ahead: ahead)
         guard !seeking else {
-            // A jump is already in flight and its response has not yet brought
-            // media: retry with the new playback cookie instead of firing a
-            // second, competing jump.
-            guard !jumpPending else {
-                return continuationBody(timeMs: request.timeMs)
-            }
             return jumpBody(for: request)
         }
         return reachedEnd ? nil : continuationBody(timeMs: request.timeMs)
@@ -176,16 +176,12 @@ final class SABRSession {
     /// target, then jump. Claiming the target itself is buffered makes the
     /// server answer with reloadPlayerResponse instead of media.
     private func jumpBody(for request: SABRReadRequest) -> Data? {
-        // Keep the real progress for the retry that follows a policy-only
-        // response, and seed both streams so continuationBody can run after
-        // the jump: it requires audio and video progress to both exist.
         let audioProgress = progress[audio.itag]
             ?? SABRStreamProgress(format: audio, lastSequence: 1, bufferedMs: 0)
         let videoProgress = progress[video.itag]
             ?? SABRStreamProgress(format: video, lastSequence: 1, bufferedMs: 0)
-        progress[audio.itag] = audioProgress
-        progress[video.itag] = videoProgress
         resetBuffers()
+        progress.removeAll()
         reachedEnd = false
         lastServedMs = request.timeMs
         jumpPending = true
@@ -201,8 +197,7 @@ final class SABRSession {
             identity: identity,
             playerMs: request.timeMs,
             audioProgress: audioProgress,
-            videoProgress: videoProgress,
-            playbackCookie: playbackCookie
+            videoProgress: videoProgress
         )
     }
 

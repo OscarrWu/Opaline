@@ -30,6 +30,9 @@ final class SABRDelivery: StreamDelivery {
 
     private let transport: HTTPTransport
     private var session: SABRSession?
+    /// Called when a session asks for a rebuild (seek failed / server reload),
+    /// with the position to resume at in milliseconds.
+    var onReloadRequested: ((Int) -> Void)?
     /// One server for the whole delivery; sessions come and go behind it.
     var server: LocalMediaServer?
     var serverBase: URL?
@@ -157,6 +160,9 @@ final class SABRDelivery: StreamDelivery {
             video: Self.formatInfo(request.video),
             identity: identity
         )
+        session.onReloadRequested = { [weak self] ms in
+            self?.onReloadRequested?(ms)
+        }
         self.session = session
         session.start(resumeAt: request.resumeAt == nil ? 0 : playhead) { [weak self] result in
             switch result {
