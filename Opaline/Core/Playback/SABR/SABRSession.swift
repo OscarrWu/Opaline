@@ -155,12 +155,7 @@ final class SABRSession {
         let isRetry = isRetry(itag: request.itag, offset: request.offset)
         let ahead = isAheadOfStream(request)
         let seeking = (needsSeek && !isRetry) || ahead
-        AppLog.hls(
-            "nextBody itag=\(request.itag) off=\(request.offset) t=\(request.timeMs)"
-                + " seq=\(request.sequence) seeking=\(seeking) needsSeek=\(needsSeek)"
-                + " retry=\(isRetry) ahead=\(ahead)"
-                + " bufferedMs=\(progress.values.map(\.bufferedMs).min() ?? 0)"
-        )
+        logNextBody(request, needsSeek: needsSeek, isRetry: isRetry, ahead: ahead)
         guard !seeking else {
             resetBuffers()
             progress.removeAll()
@@ -184,6 +179,23 @@ final class SABRSession {
             )
         }
         return reachedEnd ? nil : continuationBody(timeMs: request.timeMs)
+    }
+
+    /// Diagnostics for the seek investigation: why this read was classified
+    /// as a seek (or not) and where the stream currently is.
+    private func logNextBody(
+        _ request: SABRReadRequest,
+        needsSeek: Bool,
+        isRetry: Bool,
+        ahead: Bool
+    ) {
+        let seeking = (needsSeek && !isRetry) || ahead
+        AppLog.hls(
+            "nextBody itag=\(request.itag) off=\(request.offset) t=\(request.timeMs)"
+                + " seq=\(request.sequence) seeking=\(seeking) needsSeek=\(needsSeek)"
+                + " retry=\(isRetry) ahead=\(ahead)"
+                + " bufferedMs=\(progress.values.map(\.bufferedMs).min() ?? 0)"
+        )
     }
 
     private func continuationBody(timeMs: Int) -> Data? {

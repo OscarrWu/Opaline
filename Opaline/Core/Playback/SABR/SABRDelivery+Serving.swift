@@ -105,10 +105,7 @@ extension SABRDelivery {
             return
         }
         let requestTime = timeMs(at: range.offset, in: track)
-        AppLog.hls(
-            "segment req \(track.path)/\(name) off=\(range.offset) len=\(range.length)"
-                + " t=\(requestTime) seq=\((Int(name) ?? 0) + 1)"
-        )
+        logSegmentRequest(name, of: track, range: range, timeMs: requestTime)
         session.read(SABRReadRequest(
             itag: track.format.itag,
             offset: range.offset,
@@ -124,6 +121,20 @@ extension SABRDelivery {
                 completion(nil, "")
             }
         }
+    }
+
+    /// Diagnostics for the seek investigation: which segment AVPlayer asked
+    /// for and where it maps to on the timeline.
+    private static func logSegmentRequest(
+        _ name: String,
+        of track: Track,
+        range: (offset: Int64, length: Int),
+        timeMs: Int
+    ) {
+        AppLog.hls(
+            "segment req \(track.path)/\(name) off=\(range.offset) len=\(range.length)"
+                + " t=\(timeMs) seq=\((Int(name) ?? 0) + 1)"
+        )
     }
 
     /// Byte offset of a segment: the media data starts after the index, and

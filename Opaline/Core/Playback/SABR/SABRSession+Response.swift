@@ -120,11 +120,7 @@ extension SABRSession {
         // Media arrives in several parts per segment; each continues where the
         // previous one stopped, so position by what is already buffered.
         let written = bufferedLength(itag: header.itag, from: header.startRange)
-        AppLog.hls(
-            "media itag=\(header.itag) start=\(header.startRange) written=\(written)"
-                + " seq=\(header.sequence) bufferedMs=\(header.bufferedMs)"
-                + " init=\(header.isInit) bytes=\(data.count)"
-        )
+        logMedia(header, written: written, bytes: data.count)
         store(SABRSegment(
             itag: header.itag,
             start: header.startRange + written,
@@ -139,6 +135,16 @@ extension SABRSession {
             )
         }
         return isMedia
+    }
+
+    /// Diagnostics for the seek investigation: what the server sent for one
+    /// media part and where it landed in the buffer.
+    private func logMedia(_ header: MediaHeader, written: Int64, bytes: Int) {
+        AppLog.hls(
+            "media itag=\(header.itag) start=\(header.startRange) written=\(written)"
+                + " seq=\(header.sequence) bufferedMs=\(header.bufferedMs)"
+                + " init=\(header.isInit) bytes=\(bytes)"
+        )
     }
 }
 

@@ -40,21 +40,7 @@ extension SABRSession {
         guard !inFlight, !waiting.isEmpty || shouldPrefetch else {
             return
         }
-        // Follow whoever is furthest behind, so the stream advances from the
-        // earliest point still needed instead of chasing the newest read. With
-        // nobody waiting, keep going from where playback has got to.
-        let earliest = waiting.min { $0.request.timeMs < $1.request.timeMs }
-        let target = earliest?.request ?? SABRReadRequest(
-            itag: video.itag,
-            offset: 0,
-            length: 0,
-            timeMs: lastServedMs,
-            sequence: max(1, lastServedMs / 5_000)
-        )
-        AppLog.hls(
-            "pump waiting=\(waiting.count) target=\(target.timeMs)ms itag=\(target.itag)"
-                + " off=\(target.offset) prefetch=\(earliest == nil)"
-        )
+        let target = pumpTarget()
         guard let body = nextBody(for: target) else {
             AppLog.hls("sabr pump: nothing to send, end=\(reachedEnd)")
             finishWaiters(with: SABRError.stalled)
@@ -73,6 +59,27 @@ extension SABRSession {
                 self.afterResponse()
             }
         }
+    }
+
+    /// The request the pump should send next: whoever is furthest behind, so
+    /// the stream advances from the earliest point still needed instead of
+    /// chasing the newest read. With nobody waiting, keep going from where
+    /// playback has got to. Diagnostics log the choice for the seek
+    /// investigation.
+    private func pumpTarget() -> SABRReadRequest {
+        let earliest = waiting.min { $0.request.timeMs < $1.request.timeMs }
+        let target = earliest?.request ?? SABRReadRequest(
+            itag: video.itag,
+            offset: 0,
+            length: 0,
+            timeMs: lastServedMs,
+            sequence: max(1, lastServedMs / 5_000)
+        )
+        AppLog.hls(
+            "pump waiting=\(waiting.count) target=\(target.timeMs)ms itag=\(target.itag)"
+                + " off=\(target.offset) prefetch=\(earliest == nil)"
+        )
+        return target
     }
 
     func afterResponse() {
