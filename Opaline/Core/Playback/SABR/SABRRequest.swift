@@ -81,7 +81,9 @@ enum SABRRequest {
         continuation(
             ustreamerConfig: ustreamerConfig,
             state: Continuation(
-                audio: audioProgress, video: videoProgress, playerMs: playerMs,
+                audio: audioProgress,
+                video: videoProgress,
+                playerMs: playerMs,
                 playbackCookie: playbackCookie
             ),
             identity: identity
